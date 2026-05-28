@@ -289,6 +289,44 @@ function listingTitle(L) {
   return (L.itemName && String(L.itemName).trim()) || "Предмет CS2";
 }
 
+function listingCreatedAt(L) {
+  const t = Date.parse(L.createdAt || "");
+  return Number.isFinite(t) ? t : 0;
+}
+
+function compareListings(a, b, sort) {
+  const titleA = listingTitle(a);
+  const titleB = listingTitle(b);
+  const priceA = Number(a.priceRub) || 0;
+  const priceB = Number(b.priceRub) || 0;
+  const dateA = listingCreatedAt(a);
+  const dateB = listingCreatedAt(b);
+  const sellerA = String(a.sellerName || "");
+  const sellerB = String(b.sellerName || "");
+
+  switch (sort) {
+    case "price-asc":
+      return priceA - priceB || titleA.localeCompare(titleB, "ru");
+    case "price-desc":
+      return priceB - priceA || titleB.localeCompare(titleA, "ru");
+    case "name-asc":
+      return titleA.localeCompare(titleB, "ru") || priceA - priceB;
+    case "name-desc":
+      return titleB.localeCompare(titleA, "ru") || priceB - priceA;
+    case "date-asc":
+      return dateA - dateB || priceA - priceB;
+    case "seller-asc":
+      return sellerA.localeCompare(sellerB, "ru") || priceA - priceB;
+    case "date-desc":
+    default:
+      return dateB - dateA || priceA - priceB;
+  }
+}
+
+function sortListings(list, sort) {
+  return [...list].sort((a, b) => compareListings(a, b, sort));
+}
+
 function getFilteredList() {
   let list = [...rawListings];
   const q = ($("#buySearch") && $("#buySearch").value.trim().toLowerCase()) || "";
@@ -315,12 +353,8 @@ function getFilteredList() {
       return needles.some((n) => t.includes(n.toLowerCase()));
     });
   }
-  const sort = ($("#buySort") && $("#buySort").value) || "price-asc";
-  if (sort === "price-asc") list.sort((a, b) => Number(a.priceRub) - Number(b.priceRub));
-  else if (sort === "price-desc") list.sort((a, b) => Number(b.priceRub) - Number(a.priceRub));
-  else if (sort === "name-asc") list.sort((a, b) => listingTitle(a).localeCompare(listingTitle(b), "ru"));
-  else if (sort === "name-desc") list.sort((a, b) => listingTitle(b).localeCompare(listingTitle(a), "ru"));
-  return list;
+  const sort = ($("#buySort") && $("#buySort").value) || "date-desc";
+  return sortListings(list, sort);
 }
 
 function renderListingRows(list) {
@@ -338,13 +372,17 @@ function renderListingRows(list) {
     const thumb = icon
       ? `<img class="listing-thumb" src="${escapeAttr(icon)}" alt="" width="72" height="72" loading="lazy" decoding="async" referrerpolicy="no-referrer" />`
       : `<div class="listing-thumb listing-thumb--placeholder" title="Нет превью: инвентарь продавца закрыт или предмет не найден"></div>`;
+    const onSaleBadge = `<span class="listing-on-sale-badge" title="Предмет выставлен на витрине">На продаже</span>`;
     const noteLine =
       L.note && String(L.note).trim()
         ? `<div class="muted small">${escapeHtml(L.note)}</div>`
         : `<div class="muted small">Предмет из инвентаря CS2</div>`;
     row.innerHTML = `
       <div class="listing-row-main">
-        ${thumb}
+        <div class="listing-thumb-wrap">
+          ${thumb}
+          ${onSaleBadge}
+        </div>
         <div class="listing-row-text">
           <div class="listing-item-title">${escapeHtml(title)}</div>
           <div class="muted small">${escapeHtml(L.sellerName)} · asset ${escapeHtml(L.assetid)}</div>

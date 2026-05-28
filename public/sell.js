@@ -3,9 +3,20 @@ const $ = (sel) => document.querySelector(sel);
 let currentUser = null;
 let inventoryItems = [];
 let sellContext = null;
+/** @type {Array<{id:string, assetid:string, priceRub:number}>} */
+let myActiveListings = [];
 
 let invSearchQuery = "";
 let invSortMode = "default";
+
+const INV_SORT_CYCLE = ["default", "price-asc", "price-desc", "name-asc", "name-desc"];
+const INV_SORT_LABELS = {
+  default: "как в Steam",
+  "price-asc": "цена ↑",
+  "price-desc": "цена ↓",
+  "name-asc": "название A→Z",
+  "name-desc": "название Z→A",
+};
 
 async function refreshMe() {
   const r = await fetch("/api/me");
@@ -90,6 +101,30 @@ function setInvStatus(text, isError) {
   el.style.color = isError ? "var(--danger)" : "";
 }
 
+function getListingForAsset(assetid) {
+  const id = String(assetid);
+  return myActiveListings.find((l) => String(l.assetid) === id) || null;
+}
+
+async function refreshMyListings() {
+  myActiveListings = [];
+  if (!currentUser) return;
+  try {
+    const r = await fetch("/api/listings");
+    const data = await r.json();
+    myActiveListings = (data.listings || []).filter(
+      (l) => String(l.sellerSteamId) === String(currentUser.steamId)
+    );
+  } catch {
+    myActiveListings = [];
+  }
+}
+
+function listingPriceForItem(it) {
+  const row = getListingForAsset(it.assetid);
+  return row ? Number(row.priceRub) : NaN;
+}
+
 function getFilteredSortedItems(items) {
   let list = [...items];
   const q = invSearchQuery.trim().toLowerCase();
@@ -104,16 +139,38 @@ function getFilteredSortedItems(items) {
     list.sort((a, b) => String(a.name).localeCompare(String(b.name), "ru"));
   } else if (invSortMode === "name-desc") {
     list.sort((a, b) => String(b.name).localeCompare(String(a.name), "ru"));
+  } else if (invSortMode === "price-asc") {
+    list.sort((a, b) => {
+      const pa = listingPriceForItem(a);
+      const pb = listingPriceForItem(b);
+      const aListed = Number.isFinite(pa);
+      const bListed = Number.isFinite(pb);
+      if (aListed && bListed && pa !== pb) return pa - pb;
+      if (aListed !== bListed) return aListed ? -1 : 1;
+      return String(a.name).localeCompare(String(b.name), "ru");
+    });
+  } else if (invSortMode === "price-desc") {
+    list.sort((a, b) => {
+      const pa = listingPriceForItem(a);
+      const pb = listingPriceForItem(b);
+      const aListed = Number.isFinite(pa);
+      const bListed = Number.isFinite(pb);
+      if (aListed && bListed && pa !== pb) return pb - pa;
+      if (aListed !== bListed) return aListed ? -1 : 1;
+      return String(b.name).localeCompare(String(a.name), "ru");
+    });
   }
   return list;
 }
 
 function updateSortButtonTitle() {
-  const btn = $("#btnSortPrice");
+  const btn = $("#btnInvSort");
   if (!btn) return;
-  if (invSortMode === "default") btn.title = "Порядок как в Steam. Нажмите — по имени A→Z";
-  else if (invSortMode === "name-asc") btn.title = "Сейчас: A→Z. Нажмите — Z→A";
-  else btn.title = "Сейчас: Z→A. Нажмите — сбросить";
+  const label = INV_SORT_LABELS[invSortMode] || INV_SORT_LABELS.default;
+  btn.textContent = `Сортировка: ${label}`;
+  const idx = INV_SORT_CYCLE.indexOf(invSortMode);
+  const next = INV_SORT_CYCLE[(idx + 1) % INV_SORT_CYCLE.length];
+  btn.title = `Сейчас: ${label}. Нажмите — ${INV_SORT_LABELS[next]}`;
 }
 
 async function loadInventory() {
@@ -154,18 +211,32 @@ function renderInventory() {
 
   for (const it of displayItems) {
     const card = document.createElement("article");
-    card.className = "card";
+    const listing = getListingForAsset(it.assetid);
+    const isListed = !!listing;
+    card.className = isListed ? "card card--listed" : "card";
     const tradable = it.tradable;
-    const listable = tradable && canList;
+    const listable = tradable && canList && !isListed;
+    const listedBadge = isListed
+      ? `<span class="card-listed-badge" title="Предмет уже на витрине">На продаже · ${listing.priceRub} ₽</span>`
+      : "";
+    const listBtnLabel = isListed ? "На витрине" : "На витрину";
+    const listBtnTitle = isListed
+      ? "Уже выставлен на продажу. Снять можно в разделе «Купить скины»."
+      : !tradable
+        ? "Предмет не торгуемый"
+        : !canList
+          ? "Сначала привяжите Steam Trade URL"
+          : "";
     card.innerHTML = `
-      ${it.icon ? `<img src="${escapeAttr(it.icon)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" />` : "<div style='height:72px'></div>"}
+      <div class="card-media">
+        ${it.icon ? `<img src="${escapeAttr(it.icon)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" />` : "<div class='card-media-placeholder'></div>"}
+        ${listedBadge}
+      </div>
       <h3 class="card-title">${escapeHtml(it.name)}</h3>
       <span class="badge ${tradable ? "tradable" : "locked"}">${tradable ? "Торгуемый" : "Не торгуемый"}</span>
       <div class="card-actions">
-        <button type="button" class="btn btn-primary btn-sm" data-sell="${escapeAttr(it.assetid)}" ${listable ? "" : "disabled"} title="${
-          !tradable ? "Предмет не торгуемый" : !canList ? "Сначала привяжите Steam Trade URL" : ""
-        }">
-          На витрину
+        <button type="button" class="btn btn-primary btn-sm" data-sell="${escapeAttr(it.assetid)}" ${listable ? "" : "disabled"} title="${escapeAttr(listBtnTitle)}">
+          ${listBtnLabel}
         </button>
       </div>
     `;
@@ -186,16 +257,17 @@ $("#invSearch").addEventListener("input", () => {
   renderInventory();
 });
 
-$("#btnSortPrice").addEventListener("click", () => {
-  if (invSortMode === "default") invSortMode = "name-asc";
-  else if (invSortMode === "name-asc") invSortMode = "name-desc";
-  else invSortMode = "default";
+$("#btnInvSort").addEventListener("click", () => {
+  const idx = INV_SORT_CYCLE.indexOf(invSortMode);
+  invSortMode = INV_SORT_CYCLE[(idx + 1) % INV_SORT_CYCLE.length];
   updateSortButtonTitle();
   renderInventory();
 });
 
-$("#btnRefreshInv").addEventListener("click", () => {
-  if (currentUser) loadInventory();
+$("#btnRefreshInv").addEventListener("click", async () => {
+  if (!currentUser) return;
+  await refreshMyListings();
+  await loadInventory();
 });
 
 function escapeHtml(s) {
@@ -243,6 +315,8 @@ $("#formSell").addEventListener("submit", async (ev) => {
     const data = await r.json().catch(() => ({}));
     if (!r.ok) throw new Error(data.error || "Не удалось создать объявление");
     $("#modalSell").close();
+    await refreshMyListings();
+    renderInventory();
     setInvStatus("Объявление на витрине — откройте раздел «Купить скины».");
   } catch (e) {
     alert(e.message);
@@ -260,8 +334,10 @@ updateSortButtonTitle();
 
 (async () => {
   await refreshMe();
-  if (currentUser) await loadInventory();
-  else if (params.get("login") === "fail") {
+  if (currentUser) {
+    await refreshMyListings();
+    await loadInventory();
+  } else if (params.get("login") === "fail") {
     setInvStatus("Вход через Steam не удался. Проверьте STEAM_API_KEY и PUBLIC_URL в .env", true);
   }
 })();
