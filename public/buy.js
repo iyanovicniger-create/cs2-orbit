@@ -2,6 +2,7 @@ const $ = (sel) => document.querySelector(sel);
 
 let currentUser = null;
 let rawListings = [];
+let focusLotId = null;
 
 async function refreshMe() {
   const r = await fetch("/api/me");
@@ -354,7 +355,24 @@ function getFilteredList() {
     });
   }
   const sort = ($("#buySort") && $("#buySort").value) || "date-desc";
-  return sortListings(list, sort);
+  list = sortListings(list, sort);
+
+  if (focusLotId) {
+    const forced = rawListings.find((l) => l.id === focusLotId);
+    if (forced && !list.some((l) => l.id === focusLotId)) {
+      list = [forced, ...list];
+    }
+  }
+  return list;
+}
+
+function scrollToFocusedLot() {
+  if (!focusLotId) return;
+  const el = document.getElementById(`lot-${focusLotId}`);
+  if (!el) return;
+  el.classList.add("listing-row--focus");
+  el.scrollIntoView({ behavior: "smooth", block: "center" });
+  window.setTimeout(() => el.classList.remove("listing-row--focus"), 4000);
 }
 
 function renderListingRows(list) {
@@ -363,6 +381,7 @@ function renderListingRows(list) {
   for (const L of list) {
     const row = document.createElement("div");
     row.className = "listing-row";
+    row.id = `lot-${L.id}`;
     const steamProfile = `https://steamcommunity.com/profiles/${L.sellerSteamId}`;
     const tradeBtn = L.tradeOfferUrl
       ? `<a class="btn btn-primary btn-sm" href="${escapeAttr(L.tradeOfferUrl)}" target="_blank" rel="noopener noreferrer">Предложить обмен</a>`
@@ -409,6 +428,7 @@ function renderListingRows(list) {
       loadListings();
     });
   });
+  scrollToFocusedLot();
 }
 
 function applyFiltersAndRender() {
@@ -491,6 +511,7 @@ document.addEventListener("cs2orbitbalance", (ev) => {
 });
 
 async function init() {
+  focusLotId = new URLSearchParams(location.search).get("lot");
   buildBuyCategoryBar();
   wireBuyCategoryBar();
   wireBuyCategoryRibbonScroll();

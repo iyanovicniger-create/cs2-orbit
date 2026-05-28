@@ -219,14 +219,15 @@ function renderInventory() {
     const listedBadge = isListed
       ? `<span class="card-listed-badge" title="Предмет уже на витрине">На продаже · ${listing.priceRub} ₽</span>`
       : "";
-    const listBtnLabel = isListed ? "На витрине" : "На витрину";
-    const listBtnTitle = isListed
-      ? "Уже выставлен на продажу. Снять можно в разделе «Купить скины»."
-      : !tradable
-        ? "Предмет не торгуемый"
-        : !canList
-          ? "Сначала привяжите Steam Trade URL"
-          : "";
+    const sellAction = isListed
+      ? `<a class="btn btn-danger btn-sm btn-block" href="/buy?lot=${encodeURIComponent(listing.id)}" title="Открыть объявление на витрине (${listing.priceRub} ₽)">Продаётся</a>`
+      : `<button type="button" class="btn btn-primary btn-sm btn-block" data-sell="${escapeAttr(it.assetid)}" ${listable ? "" : "disabled"} title="${escapeAttr(
+          !tradable
+            ? "Предмет не торгуемый"
+            : !canList
+              ? "Сначала привяжите Steam Trade URL"
+              : ""
+        )}">На витрину</button>`;
     card.innerHTML = `
       <div class="card-media">
         ${it.icon ? `<img src="${escapeAttr(it.icon)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" />` : "<div class='card-media-placeholder'></div>"}
@@ -235,9 +236,7 @@ function renderInventory() {
       <h3 class="card-title">${escapeHtml(it.name)}</h3>
       <span class="badge ${tradable ? "tradable" : "locked"}">${tradable ? "Торгуемый" : "Не торгуемый"}</span>
       <div class="card-actions">
-        <button type="button" class="btn btn-primary btn-sm" data-sell="${escapeAttr(it.assetid)}" ${listable ? "" : "disabled"} title="${escapeAttr(listBtnTitle)}">
-          ${listBtnLabel}
-        </button>
+        ${sellAction}
       </div>
     `;
     grid.appendChild(card);
