@@ -12,7 +12,6 @@ async function refreshAuthHeader() {
     userBox.classList.remove("hidden");
     $("#avatar").src = user.avatar || "";
     $("#avatar").alt = user.displayName;
-    $("#userName").textContent = user.displayName;
     window.CS2OrbitAuthHeader?.updateBalanceDisplay(user);
   } else {
     btnLogin.classList.remove("hidden");

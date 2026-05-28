@@ -8,9 +8,14 @@
 
   function updateBalanceDisplay(user) {
     const el = document.getElementById("userBalanceValue");
-    if (!el) return;
-    const v = user && typeof user.balanceRub === "number" ? user.balanceRub : 0;
-    el.textContent = formatRub(v);
+    if (el) {
+      const v = user && typeof user.balanceRub === "number" ? user.balanceRub : 0;
+      el.textContent = formatRub(v);
+    }
+    const head = document.getElementById("userMenuHead");
+    if (head) {
+      head.textContent = user?.displayName || "Профиль";
+    }
     if (user && typeof user.lolzTopup === "boolean") {
       lolzTopupEnabled = user.lolzTopup;
       syncTopupModalCopy();
@@ -107,24 +112,78 @@
     }
   }
 
+  async function openTopupModal() {
+    const dlg = document.getElementById("modalTopup");
+    if (!dlg) return;
+    const cfg = await loadLolzConfig();
+    if (cfg && !cfg.enabled && Array.isArray(cfg.missingKeys) && cfg.missingKeys.length) {
+      console.warn("[topup] Lolz не настроен на сервере:", cfg.missingKeys.join(", "));
+    }
+    dlg.showModal();
+  }
+
+  function initUserMenu() {
+    const menu = document.getElementById("userMenu");
+    const trigger = document.getElementById("userMenuTrigger");
+    const panel = document.getElementById("userMenuPanel");
+    if (!menu || !trigger || !panel) return;
+
+    function closeMenu() {
+      panel.classList.add("hidden");
+      trigger.setAttribute("aria-expanded", "false");
+      menu.classList.remove("user-menu--open");
+    }
+
+    function openMenu() {
+      panel.classList.remove("hidden");
+      trigger.setAttribute("aria-expanded", "true");
+      menu.classList.add("user-menu--open");
+    }
+
+    function toggleMenu() {
+      if (panel.classList.contains("hidden")) openMenu();
+      else closeMenu();
+    }
+
+    trigger.addEventListener("click", (e) => {
+      e.stopPropagation();
+      toggleMenu();
+    });
+
+    document.addEventListener("click", (e) => {
+      if (!menu.contains(e.target)) closeMenu();
+    });
+
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") closeMenu();
+    });
+
+    panel.addEventListener("click", (e) => {
+      const item = e.target.closest("[data-action]");
+      if (!item) return;
+      const action = item.getAttribute("data-action");
+      if (action === "topup") {
+        e.preventDefault();
+        closeMenu();
+        openTopupModal();
+      } else if (action === "withdraw") {
+        e.preventDefault();
+        closeMenu();
+        alert("Вывод средств скоро будет доступен.");
+      }
+    });
+  }
+
   function initTopup() {
-    const btn = document.getElementById("btnBalanceTopup");
     const dlg = document.getElementById("modalTopup");
     const cancel = document.getElementById("modalTopupCancel");
     const form = document.getElementById("formTopup");
-    if (!btn || !dlg || !form) return;
+    if (!dlg || !form) return;
 
     loadLolzConfig();
     syncTopupModalCopy();
     handleTopupReturn();
 
-    btn.addEventListener("click", async () => {
-      const cfg = await loadLolzConfig();
-      if (cfg && !cfg.enabled && Array.isArray(cfg.missingKeys) && cfg.missingKeys.length) {
-        console.warn("[topup] Lolz не настроен на сервере:", cfg.missingKeys.join(", "));
-      }
-      dlg.showModal();
-    });
     if (cancel) cancel.addEventListener("click", () => dlg.close());
 
     form.addEventListener("submit", async (ev) => {
@@ -184,11 +243,16 @@
     });
   }
 
-  window.CS2OrbitAuthHeader = { updateBalanceDisplay, refreshMeBalance };
+  function initAuthHeader() {
+    initUserMenu();
+    initTopup();
+  }
+
+  window.CS2OrbitAuthHeader = { updateBalanceDisplay, refreshMeBalance, openTopupModal };
 
   if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", initTopup);
+    document.addEventListener("DOMContentLoaded", initAuthHeader);
   } else {
-    initTopup();
+    initAuthHeader();
   }
 })();

@@ -37,17 +37,29 @@
         <nav class="nav nav--auth" id="authNav">
           <a class="btn btn-steam" href="/auth/steam" id="btnLogin">Войти через Steam</a>
           <div class="user hidden" id="userBox">
-            <div class="user-balance" aria-label="Баланс">
-              <div class="user-balance-row">
-                <span class="user-balance-label">Баланс</span>
-                <span class="user-balance-value" id="userBalanceValue">0&nbsp;₽</span>
+            <div class="user-menu" id="userMenu">
+              <button
+                type="button"
+                class="user-menu-trigger"
+                id="userMenuTrigger"
+                aria-expanded="false"
+                aria-controls="userMenuPanel"
+                aria-haspopup="menu"
+              >
+                <img class="avatar user-menu-trigger__avatar" id="avatar" alt="" width="36" height="36" />
+                <span class="user-menu-trigger__balance" id="userBalanceValue">0&nbsp;₽</span>
+                <span class="user-menu-trigger__chev" aria-hidden="true"></span>
+              </button>
+              <div class="user-menu-panel hidden" id="userMenuPanel" role="menu">
+                <div class="user-menu-head" id="userMenuHead">Профиль</div>
+                <button type="button" class="user-menu-item" role="menuitem" data-action="topup">Пополнить баланс</button>
+                <button type="button" class="user-menu-item" role="menuitem" data-action="withdraw">Вывести с баланса</button>
+                <a class="user-menu-item" role="menuitem" href="/sell">Личный кабинет</a>
+                <a class="user-menu-item" role="menuitem" href="/sell#invGrid">Инвентарь</a>
+                <span class="user-menu-item user-menu-item--soon" role="menuitem">Реферальный кабинет</span>
+                <div class="user-menu-sep" role="separator"></div>
+                <a class="user-menu-item user-menu-item--logout" role="menuitem" href="/auth/logout">Выйти</a>
               </div>
-              <button type="button" class="btn btn-primary btn-sm" id="btnBalanceTopup">Пополнить</button>
-            </div>
-            <img class="avatar" id="avatar" alt="" width="40" height="40" />
-            <div class="user-meta">
-              <span class="user-name" id="userName"></span>
-              <a class="link" href="/auth/logout">Выйти</a>
             </div>
           </div>
         </nav>

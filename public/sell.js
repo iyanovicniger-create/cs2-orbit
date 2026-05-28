@@ -33,7 +33,6 @@ async function refreshMe() {
     invToolbar.classList.remove("hidden");
     $("#avatar").src = currentUser.avatar || "";
     $("#avatar").alt = currentUser.displayName;
-    $("#userName").textContent = currentUser.displayName;
     setTradeUrlStatus(
       currentUser.tradeUrlLinked
         ? "Trade URL привязан — можно выставлять предметы на витрину."
