@@ -14,9 +14,12 @@ const PUBLIC_URL = (process.env.PUBLIC_URL || `http://localhost:${PORT}`).replac
 const SESSION_SECRET = process.env.SESSION_SECRET || "dev-secret-change-me";
 const STEAM_API_KEY = process.env.STEAM_API_KEY || "";
 
-const listingsFile = path.join(__dirname, "..", "data", "listings.json");
-const tradeUrlsFile = path.join(__dirname, "..", "data", "trade_urls.json");
-const balancesFile = path.join(__dirname, "..", "data", "balances.json");
+const dataDir = path.join(__dirname, "..", "data");
+const listingsFile = path.join(dataDir, "listings.json");
+const tradeUrlsFile = path.join(dataDir, "trade_urls.json");
+const balancesFile = path.join(dataDir, "balances.json");
+
+const { lolzConfigured, registerLolzRoutes } = require("./lolz-payments");
 
 const STEAM_ID64_BASE = 76561197960265728n;
 
@@ -211,18 +214,33 @@ app.get("/api/me", (req, res) => {
       ...req.user,
       tradeUrlLinked: !!getStoredTradeUrl(req.user.steamId),
       balanceRub: getBalanceRub(req.user.steamId),
+      lolzTopup: lolzConfigured(),
     },
   });
 });
 
+registerLolzRoutes(app, {
+  dataDir,
+  publicUrl: PUBLIC_URL,
+  requireUser,
+  getBalanceRub,
+  addBalanceRub,
+});
+
+/** Демо-пополнение только если Lolzteam не настроен (локальная разработка). */
 app.post("/api/balance/top-up", requireUser, (req, res) => {
+  if (lolzConfigured()) {
+    return res.status(403).json({
+      error: "Пополнение только через Lolzteam. Нажмите «Оплатить через Lolz».",
+    });
+  }
   try {
     const n = Number(req.body && req.body.amountRub);
     if (!Number.isFinite(n) || n < 1 || n > 500000 || Math.floor(n) !== n) {
       return res.status(400).json({ error: "Сумма: целое число от 1 до 500 000 ₽" });
     }
     const balanceRub = addBalanceRub(req.user.steamId, n);
-    res.json({ balanceRub });
+    res.json({ balanceRub, demo: true });
   } catch (e) {
     console.error("[balance top-up]", e);
     res.status(500).json({ error: "Не удалось сохранить баланс (проверьте доступ к папке data)." });
@@ -508,4 +526,9 @@ app.use(express.static(publicDir));
 app.listen(PORT, () => {
   console.log(`CS2 Market: ${PUBLIC_URL}`);
   console.log("Страницы: / и /sell — продажа, /buy — витрина, /faq, /blog");
+  if (lolzConfigured()) {
+    console.log("Пополнение: Lolzteam (invoice API)");
+  } else {
+    console.warn("[warn] Lolzteam не настроен — доступно только демо-пополнение");
+  }
 });

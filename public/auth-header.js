@@ -1,4 +1,6 @@
 (function () {
+  let lolzTopupEnabled = false;
+
   function formatRub(n) {
     const x = Math.max(0, Math.floor(Number(n) || 0));
     return new Intl.NumberFormat("ru-RU").format(x) + "\u00A0₽";
@@ -9,6 +11,86 @@
     if (!el) return;
     const v = user && typeof user.balanceRub === "number" ? user.balanceRub : 0;
     el.textContent = formatRub(v);
+    if (user && typeof user.lolzTopup === "boolean") {
+      lolzTopupEnabled = user.lolzTopup;
+      syncTopupModalCopy();
+    }
+  }
+
+  function syncTopupModalCopy() {
+    const hint = document.getElementById("topupHint");
+    const submit = document.getElementById("topupSubmitBtn");
+    if (hint) {
+      hint.textContent = lolzTopupEnabled
+        ? "Оплата через Lolzteam (карта, СБП и др.). После оплаты баланс зачислится автоматически."
+        : "Демо-режим: сумма зачисляется сразу без оплаты (на сервере не настроен Lolzteam).";
+    }
+    if (submit) {
+      submit.textContent = lolzTopupEnabled ? "Оплатить через Lolz" : "Зачислить (демо)";
+    }
+  }
+
+  async function refreshMeBalance() {
+    try {
+      const r = await fetch("/api/me", { credentials: "same-origin" });
+      const data = await r.json();
+      if (data.user) {
+        updateBalanceDisplay(data.user);
+        window.dispatchEvent(
+          new CustomEvent("cs2orbitbalance", { detail: { balanceRub: data.user.balanceRub } })
+        );
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+
+  async function pollPaymentStatus(paymentId) {
+    for (let i = 0; i < 12; i += 1) {
+      await new Promise((r) => setTimeout(r, 2000));
+      try {
+        const r = await fetch(`/api/balance/lolz/status/${encodeURIComponent(paymentId)}`, {
+          credentials: "same-origin",
+        });
+        if (!r.ok) continue;
+        const data = await r.json();
+        if (data.status === "paid") {
+          updateBalanceDisplay({ balanceRub: data.balanceRub, lolzTopup: true });
+          window.dispatchEvent(
+            new CustomEvent("cs2orbitbalance", { detail: { balanceRub: data.balanceRub } })
+          );
+          return true;
+        }
+      } catch {
+        /* retry */
+      }
+    }
+    return false;
+  }
+
+  function handleTopupReturn() {
+    const params = new URLSearchParams(location.search);
+    if (params.get("topup") !== "success") return;
+    const paymentId = params.get("payment_id");
+    params.delete("topup");
+    params.delete("payment_id");
+    const qs = params.toString();
+    const clean = location.pathname + (qs ? `?${qs}` : "");
+    history.replaceState({}, "", clean);
+
+    (async () => {
+      if (paymentId) {
+        const ok = await pollPaymentStatus(paymentId);
+        if (ok) {
+          alert("Оплата прошла успешно. Баланс обновлён.");
+          return;
+        }
+      }
+      await refreshMeBalance();
+      alert(
+        "Вы вернулись с оплаты. Если деньги списались, баланс обновится в течение минуты — обновите страницу."
+      );
+    })();
   }
 
   function initTopup() {
@@ -18,6 +100,9 @@
     const form = document.getElementById("formTopup");
     if (!btn || !dlg || !form) return;
 
+    syncTopupModalCopy();
+    handleTopupReturn();
+
     btn.addEventListener("click", () => dlg.showModal());
     if (cancel) cancel.addEventListener("click", () => dlg.close());
 
@@ -25,12 +110,17 @@
       ev.preventDefault();
       const fd = new FormData(form);
       const amountRub = Number(fd.get("amount"));
-      if (!Number.isFinite(amountRub) || amountRub < 1 || amountRub > 500000) {
-        alert("Укажите сумму от 1 до 500 000 ₽");
+      const min = lolzTopupEnabled ? 10 : 1;
+      if (!Number.isFinite(amountRub) || amountRub < min || amountRub > 500000) {
+        alert(`Укажите сумму от ${min} до 500 000 ₽`);
         return;
       }
+      const submitBtn = document.getElementById("topupSubmitBtn");
+      if (submitBtn) submitBtn.disabled = true;
+
       try {
-        const r = await fetch("/api/balance/top-up", {
+        const endpoint = lolzTopupEnabled ? "/api/balance/lolz/create-invoice" : "/api/balance/top-up";
+        const r = await fetch(endpoint, {
           method: "POST",
           credentials: "same-origin",
           headers: { "Content-Type": "application/json" },
@@ -53,18 +143,27 @@
             `Ошибка ${r.status}`;
           throw new Error(hint);
         }
-        updateBalanceDisplay({ balanceRub: data.balanceRub });
+
+        if (lolzTopupEnabled && data.payUrl) {
+          dlg.close();
+          window.location.href = data.payUrl;
+          return;
+        }
+
+        updateBalanceDisplay({ balanceRub: data.balanceRub, lolzTopup: false });
         window.dispatchEvent(
           new CustomEvent("cs2orbitbalance", { detail: { balanceRub: data.balanceRub } })
         );
         dlg.close();
       } catch (e) {
         alert(e.message);
+      } finally {
+        if (submitBtn) submitBtn.disabled = false;
       }
     });
   }
 
-  window.CS2OrbitAuthHeader = { updateBalanceDisplay };
+  window.CS2OrbitAuthHeader = { updateBalanceDisplay, refreshMeBalance };
 
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", initTopup);
