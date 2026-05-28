@@ -93,6 +93,20 @@
     })();
   }
 
+  async function loadLolzConfig() {
+    try {
+      const r = await fetch("/api/balance/lolz/config", { credentials: "same-origin" });
+      const data = await r.json();
+      if (typeof data.enabled === "boolean") {
+        lolzTopupEnabled = data.enabled;
+        syncTopupModalCopy();
+      }
+      return data;
+    } catch {
+      return null;
+    }
+  }
+
   function initTopup() {
     const btn = document.getElementById("btnBalanceTopup");
     const dlg = document.getElementById("modalTopup");
@@ -100,10 +114,17 @@
     const form = document.getElementById("formTopup");
     if (!btn || !dlg || !form) return;
 
+    loadLolzConfig();
     syncTopupModalCopy();
     handleTopupReturn();
 
-    btn.addEventListener("click", () => dlg.showModal());
+    btn.addEventListener("click", async () => {
+      const cfg = await loadLolzConfig();
+      if (cfg && !cfg.enabled && Array.isArray(cfg.missingKeys) && cfg.missingKeys.length) {
+        console.warn("[topup] Lolz не настроен на сервере:", cfg.missingKeys.join(", "));
+      }
+      dlg.showModal();
+    });
     if (cancel) cancel.addEventListener("click", () => dlg.close());
 
     form.addEventListener("submit", async (ev) => {

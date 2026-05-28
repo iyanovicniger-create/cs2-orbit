@@ -19,7 +19,7 @@ const listingsFile = path.join(dataDir, "listings.json");
 const tradeUrlsFile = path.join(dataDir, "trade_urls.json");
 const balancesFile = path.join(dataDir, "balances.json");
 
-const { lolzConfigured, registerLolzRoutes } = require("./lolz-payments");
+const { lolzConfigured, lolzMissingEnvKeys, registerLolzRoutes } = require("./lolz-payments");
 
 const STEAM_ID64_BASE = 76561197960265728n;
 
@@ -529,6 +529,9 @@ app.listen(PORT, () => {
   if (lolzConfigured()) {
     console.log("Пополнение: Lolzteam (invoice API)");
   } else {
-    console.warn("[warn] Lolzteam не настроен — доступно только демо-пополнение");
+    const miss = lolzMissingEnvKeys();
+    console.warn(
+      `[warn] Lolzteam не настроен — демо-пополнение. Заполните в .env: ${miss.join(", ") || "LOLZ_*"}`
+    );
   }
 });

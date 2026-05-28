@@ -3,12 +3,16 @@ const path = require("path");
 
 const LOLZ_API_BASE = "https://prod-api.lzt.market";
 
+function lolzMissingEnvKeys() {
+  const missing = [];
+  if (!String(process.env.LOLZ_API_TOKEN || "").trim()) missing.push("LOLZ_API_TOKEN");
+  if (!String(process.env.LOLZ_MERCHANT_ID || "").trim()) missing.push("LOLZ_MERCHANT_ID");
+  if (!String(process.env.LOLZ_WEBHOOK_SECRET || "").trim()) missing.push("LOLZ_WEBHOOK_SECRET");
+  return missing;
+}
+
 function lolzConfigured() {
-  return !!(
-    process.env.LOLZ_API_TOKEN &&
-    process.env.LOLZ_MERCHANT_ID &&
-    process.env.LOLZ_WEBHOOK_SECRET
-  );
+  return lolzMissingEnvKeys().length === 0;
 }
 
 function paymentsFilePath(dataDir) {
@@ -112,9 +116,11 @@ function verifyWebhookSecret(req) {
 
 function registerLolzRoutes(app, { dataDir, publicUrl, requireUser, getBalanceRub, addBalanceRub }) {
   app.get("/api/balance/lolz/config", (req, res) => {
+    const missing = lolzMissingEnvKeys();
     res.json({
-      enabled: lolzConfigured(),
+      enabled: missing.length === 0,
       provider: "lolzteam",
+      missingKeys: missing,
     });
   });
 
@@ -235,5 +241,6 @@ function registerLolzRoutes(app, { dataDir, publicUrl, requireUser, getBalanceRu
 
 module.exports = {
   lolzConfigured,
+  lolzMissingEnvKeys,
   registerLolzRoutes,
 };
