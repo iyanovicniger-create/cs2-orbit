@@ -391,7 +391,6 @@ function renderListingRows(list) {
     const thumb = icon
       ? `<img class="listing-thumb" src="${escapeAttr(icon)}" alt="" width="72" height="72" loading="lazy" decoding="async" referrerpolicy="no-referrer" />`
       : `<div class="listing-thumb listing-thumb--placeholder" title="Нет превью: инвентарь продавца закрыт или предмет не найден"></div>`;
-    const onSaleBadge = `<span class="listing-on-sale-badge" title="Предмет выставлен на витрине">На продаже</span>`;
     const noteLine =
       L.note && String(L.note).trim()
         ? `<div class="muted small">${escapeHtml(L.note)}</div>`
@@ -400,7 +399,6 @@ function renderListingRows(list) {
       <div class="listing-row-main">
         <div class="listing-thumb-wrap">
           ${thumb}
-          ${onSaleBadge}
         </div>
         <div class="listing-row-text">
           <div class="listing-item-title">${escapeHtml(title)}</div>

@@ -213,12 +213,9 @@ function renderInventory() {
     const card = document.createElement("article");
     const listing = getListingForAsset(it.assetid);
     const isListed = !!listing;
-    card.className = isListed ? "card card--listed" : "card";
+    card.className = "card";
     const tradable = it.tradable;
     const listable = tradable && canList && !isListed;
-    const listedBadge = isListed
-      ? `<span class="card-listed-badge" title="Предмет уже на витрине">На продаже · ${listing.priceRub} ₽</span>`
-      : "";
     const sellAction = isListed
       ? `<a class="btn btn-danger btn-sm btn-block" href="/buy?lot=${encodeURIComponent(listing.id)}" title="Открыть объявление на витрине (${listing.priceRub} ₽)">Продаётся</a>`
       : `<button type="button" class="btn btn-primary btn-sm btn-block" data-sell="${escapeAttr(it.assetid)}" ${listable ? "" : "disabled"} title="${escapeAttr(
@@ -231,7 +228,6 @@ function renderInventory() {
     card.innerHTML = `
       <div class="card-media">
         ${it.icon ? `<img src="${escapeAttr(it.icon)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" />` : "<div class='card-media-placeholder'></div>"}
-        ${listedBadge}
       </div>
       <h3 class="card-title">${escapeHtml(it.name)}</h3>
       <span class="badge ${tradable ? "tradable" : "locked"}">${tradable ? "Торгуемый" : "Не торгуемый"}</span>
